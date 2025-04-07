@@ -26,6 +26,7 @@
 
 #include "word_count.h"
 
+//test
 void init_words(word_count_list_t *wclist) {
     /* TODO */
 }
