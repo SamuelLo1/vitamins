@@ -27,23 +27,62 @@
 #include "word_count.h"
 
 void init_words(word_count_list_t *wclist) {
-    /* TODO */
+    /* Initialize word count.  */
+    list_init(wclist);
 }
 
+//count the number of words in the list
 size_t len_words(word_count_list_t *wclist) {
-    /* TODO */
-    return 0;
+    size_t len = 0;
+    struct list_elem *e;
+    
+    // Properly iterate through the Pintos list
+    for (e = list_begin(wclist); e != list_end(wclist); e = list_next(e)) {
+        len++;
+    }
+    
+    return len;
 }
 
+
+/*
+    how list_entry works: 
+        - list_entry is a macro that finds the word_count_t struct that contains the list_elem
+        - traversal is done via the list_elem struct
+*/
+
+
+/* Find a word in a word_count list. */
 word_count_t *find_word(word_count_list_t *wclist, char *word) {
-    /* TODO */
+    struct list_elem *e;
+    // Properly iterate through the Pintos list
+    for (e = list_begin(wclist); e != list_end(wclist); e = list_next(e)) {
+        if (strcmp(word, list_entry(e, word_count_t, elem)->word) == 0) {
+            return list_entry(e, word_count_t, elem);
+        }
+    }
     return NULL;
 }
 
+/*
+ * Insert word with count=1, if not already present; increment count if
+ * present. Takes ownership of word.
+ */
 word_count_t *add_word_with_count(word_count_list_t *wclist, char *word,
                                   int count) {
-    /* TODO */
-    return NULL;
+    //traverse list through list_elem                                
+    word_count_t *wc = find_word(wclist, word);
+    
+    if (wc != NULL) {
+        wc->count++; 
+    } else if((wc = malloc(sizeof(word_count_t))) != NULL ){
+        wc->word = word;
+        wc->count = count;
+        list_push_back(wclist, &wc->elem); 
+    } else {
+        perror("malloc");
+    }
+    return wc;
 }
 
 word_count_t *add_word(word_count_list_t *wclist, char *word) {
@@ -51,13 +90,23 @@ word_count_t *add_word(word_count_list_t *wclist, char *word) {
 }
 
 void fprint_words(word_count_list_t *wclist, FILE *outfile) {
-    /* TODO */
+    struct list_elem *e;
+    // Properly iterate through the Pintos list
+    for (e = list_begin(wclist); e != list_end(wclist); e = list_next(e)) {
+        word_count_t *wc = list_entry(e, word_count_t, elem);
+        fprintf(outfile, "%8d\t%s\n", wc->count, wc->word);
+    }
 }
 
 static bool less_list(const struct list_elem *ewc1,
                       const struct list_elem *ewc2, void *aux) {
-    /* TODO */
-    return false;
+    /* Convert list elements to word_count_t structures */
+    word_count_t *wc1 = list_entry(ewc1, word_count_t, elem);
+    word_count_t *wc2 = list_entry(ewc2, word_count_t, elem);
+    
+    /* Call the user-provided comparison function (passed in aux) */
+    bool (*less)(const word_count_t *, const word_count_t *) = aux;
+    return less(wc1, wc2);
 }
 
 void wordcount_sort(word_count_list_t *wclist,

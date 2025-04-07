@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2019 University of California, Berkeley
+ * Copyright (C) 2019 Universi ty of California, Berkeley
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
