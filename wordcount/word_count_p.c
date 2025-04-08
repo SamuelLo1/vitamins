@@ -41,31 +41,66 @@ void init_words(word_count_list_t *wclist) {
 size_t len_words(word_count_list_t *wclist) {
     size_t len = 0; 
     pthread_mutex_lock(&wclist->lock);
-    word_count_t *cur; 
-    for (cur = list_begin(&wclist->lst); cur != list_end(&wclist->lst);
-         cur = list_next(cur)) {
+    struct list_elem *e;
+    // Properly iterate through the Pintos list
+    for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
         len++;
     }
     pthread_mutex_unlock(&wclist->lock);
-    //test
     return 0;
 }
 
+//find if the word exists in the list already
 word_count_t *find_word(word_count_list_t *wclist, char *word) {
-    /* TODO */
+    pthread_mutex_lock(&wclist->lock);
+    struct list_elem *e;
+    // Properly iterate through the Pintos list
+    for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
+        word_count_t *wc = list_entry(e, word_count_t, elem);
+        if (strcmp(word, wc->word) == 0) {
+            pthread_mutex_unlock(&wclist->lock);
+            return wc;
+        }
+    }
+    pthread_mutex_unlock(&wclist->lock);
     return NULL;
 }
 
 word_count_t *add_word(word_count_list_t *wclist, char *word) {
-    /* TODO */
-    return NULL;
+    pthread_mutex_lock(&wclist->lock);
+    word_count_t *wc = find_word(wclist, word);
+    if (wc != NULL) {
+        wc->count++;
+        pthread_mutex_unlock(&wclist->lock);
+        return wc;
+    }
+    //create new word_count_t to add to the list
+    wc = malloc(sizeof(word_count_t));
+    if (wc == NULL) {
+        pthread_mutex_unlock(&wclist->lock);
+        return NULL;
+    }
+    wc->word = word;
+    wc->count = 1;
+    list_push_back(&wclist->lst, &wc->elem);
+    pthread_mutex_unlock(&wclist->lock);
+    return wc;
 }
 
 void fprint_words(word_count_list_t *wclist, FILE *outfile) {
-    /* TODO */
+    pthread_mutex_lock(&wclist->lock);
+    struct list_elem *e;
+    //Iterate through the Pintos list
+    for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
+        word_count_t *wc = list_entry(e, word_count_t, elem);
+        fprintf(outfile, "%s %d\n", wc->word, wc->count);
+    }
+    pthread_mutex_unlock(&wclist->lock);
 }
 
 void wordcount_sort(word_count_list_t *wclist,
                     bool less(const word_count_t *, const word_count_t *)) {
-    /* TODO */
+    pthread_mutex_lock(&wclist->lock);
+    list_sort(&wclist->lst, (list_less_func *)less, NULL);
+    pthread_mutex_unlock(&wclist->lock);
 }

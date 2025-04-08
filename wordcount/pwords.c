@@ -61,6 +61,9 @@ void *count_words_wrapper(void *args) {
  */
 int main(int argc, char *argv[]) {
     /* Create the empty data structure. */
+    /* Don't forget that this word_counts_t works different because its a struct
+       with lock and lst instead of regular PINTOS list. 
+    */
     word_count_list_t word_counts;
     init_words(&word_counts);
     if (argc <= 1) {
