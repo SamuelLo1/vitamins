@@ -32,6 +32,30 @@
 #include "word_count.h"
 #include "word_helpers.h"
 
+//struct to hold arguments for each count_words call by create threads
+typedef struct {
+    word_count_list_t *word_counts;
+    char *filename;
+} thread_args_t;
+
+//wrapper function for count_words to be used with pthread_create
+void *count_words_wrapper(void *args) {
+    //extract arguments from the struct
+    thread_args_t *targs = (thread_args_t *)args;
+    FILE *infile = fopen(targs->filename, "r");
+    printf("%s\n",targs->filename); 
+    //check if file opened successfully
+    if (infile == NULL) {
+        perror("fopen");
+        return NULL;
+    }
+
+    count_words(targs->word_counts, infile);
+    //handle freeing of owned resources of targs not on stack
+    fclose(infile);
+    return NULL;
+}
+
 /*
  * main - handle command line, spawning one thread per file.
  */
@@ -39,14 +63,31 @@ int main(int argc, char *argv[]) {
     /* Create the empty data structure. */
     word_count_list_t word_counts;
     init_words(&word_counts);
-
     if (argc <= 1) {
         /* Process stdin in a single thread. */
         count_words(&word_counts, stdin);
     } else {
-        /* TODO */
-    }
+        //initialize threads and args
+        pthread_t threads[argc-1];
+        thread_args_t targs[argc-1];
+        
+        //go through each file
+        int i;
+        for (i = 1; i < argc; i++) {
+            targs[i-1].word_counts = &word_counts;
+            targs[i-1].filename = argv[i];
 
+            if (pthread_create(&threads[i-1], NULL, count_words_wrapper, &targs[i-1])){
+                perror("pthread_create did not succeed");
+                exit(1);
+            }
+        }
+        //join the threads to continue executing main
+        for (i = 0; i < argc-1; i++) {
+            pthread_join(threads[i], NULL);
+        }
+    }
+    printf("word_counts: %d\n", len_words(&word_counts));
     /* Output final result of all threads' work. */
     wordcount_sort(&word_counts, less_count);
     fprint_words(&word_counts, stdout);

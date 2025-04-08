@@ -30,12 +30,24 @@
 
 #include "word_count.h"
 
+
+//The difference from PINTO LIST is that we are using struct with lock
 void init_words(word_count_list_t *wclist) {
-    /* TODO */
+    list_init(&wclist->lst);
+    pthread_mutex_init(&wclist->lock, NULL);
 }
 
+//want to use lock to protect the list from parallel access and race conditions
 size_t len_words(word_count_list_t *wclist) {
-    /* TODO */
+    size_t len = 0; 
+    pthread_mutex_lock(&wclist->lock);
+    word_count_t *cur; 
+    for (cur = list_begin(&wclist->lst); cur != list_end(&wclist->lst);
+         cur = list_next(cur)) {
+        len++;
+    }
+    pthread_mutex_unlock(&wclist->lock);
+    //test
     return 0;
 }
 
