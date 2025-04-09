@@ -37,32 +37,27 @@ void init_words(word_count_list_t *wclist) {
     pthread_mutex_init(&wclist->lock, NULL);
 }
 
-//want to use lock to protect the list from parallel access and race conditions
 size_t len_words(word_count_list_t *wclist) {
     size_t len = 0; 
-    pthread_mutex_lock(&wclist->lock);
     struct list_elem *e;
     // Properly iterate through the Pintos list
     for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
         len++;
     }
-    pthread_mutex_unlock(&wclist->lock);
-    return 0;
+    return len;
 }
 
 //find if the word exists in the list already
+//don't use mutex locks here beacuse add_word already adds locks
 word_count_t *find_word(word_count_list_t *wclist, char *word) {
-    pthread_mutex_lock(&wclist->lock);
     struct list_elem *e;
     // Properly iterate through the Pintos list
     for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
         word_count_t *wc = list_entry(e, word_count_t, elem);
         if (strcmp(word, wc->word) == 0) {
-            pthread_mutex_unlock(&wclist->lock);
             return wc;
         }
     }
-    pthread_mutex_unlock(&wclist->lock);
     return NULL;
 }
 
@@ -88,19 +83,15 @@ word_count_t *add_word(word_count_list_t *wclist, char *word) {
 }
 
 void fprint_words(word_count_list_t *wclist, FILE *outfile) {
-    pthread_mutex_lock(&wclist->lock);
     struct list_elem *e;
     //Iterate through the Pintos list
     for (e = list_begin(&wclist->lst); e != list_end(&wclist->lst); e = list_next(e)) {
         word_count_t *wc = list_entry(e, word_count_t, elem);
         fprintf(outfile, "%s %d\n", wc->word, wc->count);
     }
-    pthread_mutex_unlock(&wclist->lock);
 }
 
 void wordcount_sort(word_count_list_t *wclist,
                     bool less(const word_count_t *, const word_count_t *)) {
-    pthread_mutex_lock(&wclist->lock);
-    list_sort(&wclist->lst, (list_less_func *)less, NULL);
-    pthread_mutex_unlock(&wclist->lock);
+    list_sort(&wclist->lst, less, NULL);
 }

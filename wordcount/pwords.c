@@ -33,27 +33,24 @@
 #include "word_helpers.h"
 
 //struct to hold arguments for each count_words call by create threads
-typedef struct {
-    word_count_list_t *word_counts;
-    char *filename;
-} thread_args_t;
+
+word_count_list_t word_counts;
 
 //wrapper function for count_words to be used with pthread_create
-void *count_words_wrapper(void *args) {
+void *count_words_wrapper(void *filename) {
     //extract arguments from the struct
-    thread_args_t *targs = (thread_args_t *)args;
-    FILE *infile = fopen(targs->filename, "r");
-    printf("%s\n",targs->filename); 
+    FILE *infile = fopen(filename, "r");
     //check if file opened successfully
     if (infile == NULL) {
         perror("fopen");
         return NULL;
     }
-
-    count_words(targs->word_counts, infile);
+    printf("before count_word\n");
+    count_words(&word_counts, infile);
+    printf("after count_words\n");
     //handle freeing of owned resources of targs not on stack
     fclose(infile);
-    return NULL;
+    pthread_exit(NULL);
 }
 
 /*
@@ -64,23 +61,18 @@ int main(int argc, char *argv[]) {
     /* Don't forget that this word_counts_t works different because its a struct
        with lock and lst instead of regular PINTOS list. 
     */
-    word_count_list_t word_counts;
+    printf("before init_words\n");
     init_words(&word_counts);
     if (argc <= 1) {
         /* Process stdin in a single thread. */
         count_words(&word_counts, stdin);
     } else {
-        //initialize threads and args
+        //initialize threads
         pthread_t threads[argc-1];
-        thread_args_t targs[argc-1];
-        
         //go through each file
         int i;
         for (i = 1; i < argc; i++) {
-            targs[i-1].word_counts = &word_counts;
-            targs[i-1].filename = argv[i];
-
-            if (pthread_create(&threads[i-1], NULL, count_words_wrapper, &targs[i-1])){
+            if (pthread_create(&threads[i-1], NULL, count_words_wrapper, (void *)argv[i])){
                 perror("pthread_create did not succeed");
                 exit(1);
             }
@@ -90,8 +82,8 @@ int main(int argc, char *argv[]) {
             pthread_join(threads[i], NULL);
         }
     }
-    printf("word_counts: %d\n", len_words(&word_counts));
     /* Output final result of all threads' work. */
+    printf("%d\n", len_words(&word_counts));
     wordcount_sort(&word_counts, less_count);
     fprint_words(&word_counts, stdout);
     return 0;
