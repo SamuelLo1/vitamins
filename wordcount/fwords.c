@@ -29,19 +29,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "word_count.h"
 #include "word_helpers.h"
+/*
+    fork seperate child process for each file. Merge output of each process into final output
+    each child process sends output to parent via pipe and parent uses merge_counts to merge results
+
+*/
+
+
 
 /*
  * Read stream of counts and accumulate globally.
+ * More specifically, reads from fprint stream and can merge the counts together
  */
 void merge_counts(word_count_list_t *wclist, FILE *count_stream) {
     char *word;
     int count;
     int rv;
-    while ((rv = fscanf(count_stream, "%8d\t%ms\n", &count, &word)) == 2) {
-        add_word_with_count(wclist, word, count);
+    while ((rv = fscanf(count_stream, "%8d\t%ms\n", &count, &word)) == 2)
+    {
+        add_word_with_count(wclist, word, count);\
     }
     if ((rv == EOF) && (feof(count_stream) == 0)) {
         perror("could not read counts");
@@ -62,8 +72,73 @@ int main(int argc, char *argv[]) {
         /* Process stdin in a single process. */
         count_words(&word_counts, stdin);
     } else {
-        /* TODO */
+        /* Process each file in a separate process. */
+        int i;
+        //use multiple pipes because one pipe is not enough
+        int pipefds[argc - 1][2];
+        
+        /* Process each file in a separate process. */
+        for (i = 1; i < argc; i++) {
+            if (pipe(pipefds[i-1]) == -1) {
+                perror("pipe");
+                exit(1);
+            }
+            pid_t pid = fork();
+            if (pid == 0) {
+                /* Child process. */
+                close(pipefds[i-1][0]); 
+                // Redirect stdout to the write end of the pipe
+                
+
+                FILE *infile = fopen(argv[i], "r");
+                if (infile == NULL) {
+                    perror("fopen");
+                    exit(1);
+                }
+
+                FILE *outfile = fdopen(pipefds[i-1][1], "w");
+                if (outfile == NULL) {
+                    perror("fdopen");
+                    exit(1);
+                }
+
+                // Count words and write to the pipe
+                count_words(&word_counts, infile);
+                printf("count_words done! \n");
+                wordcount_sort(&word_counts, less_count);
+                fprint_words(&word_counts, stdout);
+                printf("fprint done! \n");
+
+                fclose(outfile);
+                fclose(infile);
+                exit(0);
+            } else if (pid < 0) {
+                perror("fork");
+                exit(1);
+            }
+        }
+
+        for (i = 1; i < argc; i++) {
+            printf("child process %d exited\n", i);
+            close(pipefds[i-1][1]); 
+            FILE *pipe_stream = fdopen(pipefds[i-1][0], "r");
+            if (pipe_stream == NULL) {
+                perror("fdopen");
+                continue;
+            } 
+            merge_counts(&word_counts, pipe_stream);
+            printf("merge_counts done! \n");
+            fclose(pipe_stream); // Don't forget to close the stream
+            
+        }
+        for (i = 1; i < argc; i++) {
+            wait(NULL); // Wait for each child process to finish
+        }
+
+
+        
     }
+
 
     /* Output final result of all process' work. */
     wordcount_sort(&word_counts, less_count);
