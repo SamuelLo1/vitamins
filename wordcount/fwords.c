@@ -113,25 +113,16 @@ int main(int argc, char *argv[]) {
                 close(pipefds[i-1][1]); 
             }
         }
-
-        for (i = 1; i < argc; i++) {
-            wait(NULL); // Wait for all child processes to finish
-        }
         
         for (i = 1; i < argc; i++) {
-            printf("child process %d exited\n", i);
-            close(pipefds[i-1][1]); 
             FILE *pipe_stream = fdopen(pipefds[i-1][0], "r");
-            if (pipe_stream == NULL) {
+            if (!pipe_stream) {
                 perror("fdopen");
                 continue;
             } 
             merge_counts(&word_counts, pipe_stream);
-            printf("merge_counts done! \n");
             fclose(pipe_stream); // Don't forget to close the stream
-            
         }
-        
     }
 
 

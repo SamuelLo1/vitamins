@@ -75,7 +75,7 @@ word_count_t *add_word_with_count(word_count_list_t *wclist, char *word,
     word_count_t *wc = find_word(wclist, word);
     
     if (wc != NULL) {
-        wc->count++; 
+        wc->count += count; 
     } else if((wc = malloc(sizeof(word_count_t))) != NULL ){
         wc->word = word;
         wc->count = count;
@@ -92,7 +92,7 @@ word_count_t *add_word(word_count_list_t *wclist, char *word) {
 
 void fprint_words(word_count_list_t *wclist, FILE *outfile) {
     struct list_elem *e;
-    // Properly iterate through the Pintos li\st
+    // Properly iterate through the Pintos list
     for (e = list_begin(wclist); e != list_end(wclist); e = list_next(e)) {
         word_count_t *wc = list_entry(e, word_count_t, elem);
         fprintf(outfile, "%8d\t%s\n", wc->count, wc->word);
