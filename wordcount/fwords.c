@@ -100,19 +100,21 @@ int main(int argc, char *argv[]) {
                 FILE *pipe_out = fdopen(pipefds[i-1][1], "w");
                 if (pipe_out == NULL) {
                     perror("fdopen");
-                    fclose(infile); // Close the input file before exiting
+                    fclose(infile); 
                     exit(1);
                 }
 
                 fprint_words(&word_counts, pipe_out);
                 fflush(pipe_out); 
                 fclose(pipe_out);
-                close(pipefds[i-1][1]); // Close the write end of the pipe
+                close(pipefds[i-1][1]); 
                 exit(0);
             } else {
                 close(pipefds[i-1][1]); 
             }
         }
+        
+        
         
         for (i = 1; i < argc; i++) {
             FILE *pipe_stream = fdopen(pipefds[i-1][0], "r");
@@ -122,6 +124,11 @@ int main(int argc, char *argv[]) {
             } 
             merge_counts(&word_counts, pipe_stream);
             fclose(pipe_stream); // Don't forget to close the stream
+        }
+
+        //clean up to avoid zombie processes
+        for (i = 1; i < argc; i++) {
+            wait(NULL); 
         }
     }
 
