@@ -87,37 +87,37 @@ int main(int argc, char *argv[]) {
             if (pid == 0) {
                 /* Child process. */
                 close(pipefds[i-1][0]); 
-                // Redirect stdout to the write end of the pipe
                 
-
                 FILE *infile = fopen(argv[i], "r");
                 if (infile == NULL) {
                     perror("fopen");
                     exit(1);
                 }
+                printf("child process %d started\n", i);
+                count_words(&word_counts, infile);
+                fclose(infile);
 
-                FILE *outfile = fdopen(pipefds[i-1][1], "w");
-                if (outfile == NULL) {
+                FILE *pipe_out = fdopen(pipefds[i-1][1], "w");
+                if (pipe_out == NULL) {
                     perror("fdopen");
+                    fclose(infile); // Close the input file before exiting
                     exit(1);
                 }
 
-                // Count words and write to the pipe
-                count_words(&word_counts, infile);
-                printf("count_words done! \n");
-                wordcount_sort(&word_counts, less_count);
-                fprint_words(&word_counts, stdout);
-                printf("fprint done! \n");
-
-                fclose(outfile);
-                fclose(infile);
+                fprint_words(&word_counts, pipe_out);
+                fflush(pipe_out); 
+                fclose(pipe_out);
+                close(pipefds[i-1][1]); // Close the write end of the pipe
                 exit(0);
-            } else if (pid < 0) {
-                perror("fork");
-                exit(1);
+            } else {
+                close(pipefds[i-1][1]); 
             }
         }
 
+        for (i = 1; i < argc; i++) {
+            wait(NULL); // Wait for all child processes to finish
+        }
+        
         for (i = 1; i < argc; i++) {
             printf("child process %d exited\n", i);
             close(pipefds[i-1][1]); 
@@ -131,16 +131,12 @@ int main(int argc, char *argv[]) {
             fclose(pipe_stream); // Don't forget to close the stream
             
         }
-        for (i = 1; i < argc; i++) {
-            wait(NULL); // Wait for each child process to finish
-        }
-
-
         
     }
 
 
     /* Output final result of all process' work. */
+    printf("len_words: %d\n", len_words(&word_counts));
     wordcount_sort(&word_counts, less_count);
     fprint_words(&word_counts, stdout);
     return 0;
