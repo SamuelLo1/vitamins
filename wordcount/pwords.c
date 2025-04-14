@@ -45,9 +45,7 @@ void *count_words_wrapper(void *filename) {
         perror("fopen");
         return NULL;
     }
-    printf("before count_word\n");
     count_words(&word_counts, infile);
-    printf("after count_words\n");
     //handle freeing of owned resources of targs not on stack
     fclose(infile);
     pthread_exit(NULL);
@@ -83,7 +81,6 @@ int main(int argc, char *argv[]) {
         }
     }
     /* Output final result of all threads' work. */
-    printf("%d\n", len_words(&word_counts));
     wordcount_sort(&word_counts, less_count);
     fprint_words(&word_counts, stdout);
     return 0;
