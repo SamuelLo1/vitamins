@@ -109,7 +109,29 @@ int lookup(char *cmd) {
 }
 
 /* function to handle forking processes for programs executed via shell */
-int execute_program(){
+int execute_prog(char* program, char* args[]) {
+    if (program == NULL) {
+        fprintf(stderr, "No program specified\n");
+        return -1;
+    }
+    // fork a child process
+    pid_t pid = fork(); 
+    if (pid < 0) {
+        perror("fork");
+        return -1;
+    } else if (pid == 0) {
+        // Note: execv terminates child process after finishing
+        execv(program, args);
+        // Note: if execv fails, it will proceeed to perror
+        perror("execv");
+        exit(EXIT_FAILURE);
+    } else {
+        // parent process: wait for child to finish
+        int status;
+        waitpid(pid, &status, 0);
+        return WEXITSTATUS(status);
+    }
+    //execv takes in path and argumetns
     return 0; 
 }
 
@@ -170,7 +192,17 @@ int main(unused int argc, unused char *argv[]) {
                 if it does, fork a child process and run the program
                 if it doesn't, print an error message
             */
-            
+
+            // use tokens to get program name and args
+            char *program = tokens_get_token(tokens, 0);
+            char *args[4096];
+            args[0] = program;
+
+            for (size_t i = 1; i < tokens_get_length(tokens); i++) {
+                args[i] = tokens_get_token(tokens, i);
+            }
+
+            execute_prog(program, args);   
         }
 
         if (shell_is_interactive) {
