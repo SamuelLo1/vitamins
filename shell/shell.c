@@ -114,25 +114,57 @@ int execute_prog(char* program, char* args[]) {
         fprintf(stderr, "No program specified\n");
         return -1;
     }
-    // fork a child process
-    pid_t pid = fork(); 
+
+    pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
         return -1;
     } else if (pid == 0) {
-        // Note: execv terminates child process after finishing
-        execv(program, args);
-        // Note: if execv fails, it will proceeed to perror
-        perror("execv");
+        // child process check that a '/' exists, assume full path provided
+        if (strchr(program, '/')) {
+            execv(program, args);
+            perror("execv");
+            exit(EXIT_FAILURE);
+        }
+
+        // getting path is a list of all the possible paths os searches for executables
+        char* path_env = getenv("PATH");
+        if (path_env == NULL) {
+            fprintf(stderr, "PATH not found in environment\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Make a copy of the PATH because strtok modifies it
+        char* path_copy = strdup(path_env);
+        if (path_copy == NULL) {
+            perror("strdup");
+            exit(EXIT_FAILURE);
+        }
+
+        // tokenize all paths 
+        char* dir = strtok(path_copy, ":");
+        // iterate tokenzied paths for match
+        while (dir != NULL) {
+            char full_path[1024];
+            // create full_path without buffer overflow
+            snprintf(full_path, sizeof(full_path), "%s/%s", dir, program);
+            // Try execv with full path
+            execv(full_path, args);
+            // If it fails, try next
+            dir = strtok(NULL, ":");
+        }
+        // program not found 
+        free(path_copy);
+        fprintf(stderr, "%s: command not found\n", program);
         exit(EXIT_FAILURE);
     } else {
-        // parent process: wait for child to finish
+        // Parent waits for child process to finish
         int status;
         waitpid(pid, &status, 0);
         return WEXITSTATUS(status);
     }
-    //execv takes in path and argumetns
-    return 0; 
+
+    return 0;
 }
 
 
