@@ -29,8 +29,11 @@ struct termios shell_tmodes;
 /* Process group id for the shell */
 pid_t shell_pgid;
 
+/* shell specific commands */
 int cmd_exit(struct tokens *tokens);
 int cmd_help(struct tokens *tokens);
+int cmd_cd(struct tokens *tokens);
+int cmd_pwd(struct tokens *tokens);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -42,9 +45,12 @@ typedef struct fun_desc {
     char *doc;
 } fun_desc_t;
 
+/* takes in fun, cmd name, description per new command introduced */
 fun_desc_t cmd_table[] = {
     {cmd_help, "?", "show this help menu"},
     {cmd_exit, "exit", "exit the command shell"},
+    {cmd_cd, "cd", "change directory"},
+    {cmd_pwd, "pwd", "print working directory"},
 };
 
 /* Prints a helpful description for the given command */
@@ -60,6 +66,36 @@ int cmd_exit(unused struct tokens *tokens) {
     exit(0);
 }
 
+/* Gets current working directory */
+int cmd_pwd(unused struct tokens *tokens) {
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+    } else {
+        perror("getcwd() error");
+    }
+    return 1;
+}
+
+/* Changes the current working directory */
+/*
+    Tokens are useful. Essentially arguments turned to words
+    by the tokenizer that are parsed 
+    from the command line. Think of argv in main. 
+*/
+int cmd_cd(struct tokens *tokens) {
+    // can only take in one argument
+    if (tokens_get_length(tokens) != 2) {
+        fprintf(stderr, "cd: wrong number of arguments\n");
+        return 1;
+    }
+    // get the directory argument
+    if (chdir(tokens_get_token(tokens, 1)) != 0) {
+        perror("cd");
+    }
+    return 1;
+}
+
 /* Looks up the built-in command, if it exists. */
 int lookup(char *cmd) {
     if (cmd != NULL) {
@@ -71,6 +107,12 @@ int lookup(char *cmd) {
     }
     return -1;
 }
+
+/* function to handle forking processes for programs executed via shell */
+int execute_program(){
+    return 0; 
+}
+
 
 /* Intialization procedures for this shell */
 void init_shell() {
@@ -122,8 +164,13 @@ int main(unused int argc, unused char *argv[]) {
         if (fundex >= 0) {
             cmd_table[fundex].fun(tokens);
         } else {
-            /* REPLACE this to run commands as programs. */
-            fprintf(stdout, "This shell doesn't know how to run programs.\n");
+            /*  
+                need a function to try to run a program
+                first check if the program exists by checking full path
+                if it does, fork a child process and run the program
+                if it doesn't, print an error message
+            */
+            
         }
 
         if (shell_is_interactive) {
