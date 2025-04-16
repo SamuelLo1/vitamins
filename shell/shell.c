@@ -108,8 +108,10 @@ int lookup(char *cmd) {
     return -1;
 }
 
+
+
 /* function to handle forking processes for programs executed via shell */
-int execute_prog(char* program, char* args[]) {
+int execute_prog(char* program, char* args[], char* infile, char* outfile) {
     if (program == NULL) {
         fprintf(stderr, "No program specified\n");
         return -1;
@@ -120,51 +122,60 @@ int execute_prog(char* program, char* args[]) {
         perror("fork");
         return -1;
     } else if (pid == 0) {
-        // child process check that a '/' exists, assume full path provided
+        // currently input and output still does not work 
+        // not able to write or read input from file
+        if (infile != NULL) {
+            int in_fd = open(infile, O_RDONLY);
+            if (in_fd < 0) {
+                perror("open (infile)");
+                exit(EXIT_FAILURE);
+            }
+        
+            dup2(in_fd, STDIN_FILENO);
+            close(in_fd);
+        }
+
+        // Handle output redirection
+        if (outfile != NULL) {
+            int out_fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (out_fd < 0) {
+                perror("open (outfile)");
+                exit(EXIT_FAILURE);
+            }
+            dup2(out_fd, STDOUT_FILENO);
+            close(out_fd);
+        }
+
+        // Same path resolution logic from before (see previous message)
         if (strchr(program, '/')) {
             execv(program, args);
             perror("execv");
             exit(EXIT_FAILURE);
         }
 
-        // getting path is a list of all the possible paths os searches for executables
+        // PATH resolution
         char* path_env = getenv("PATH");
         if (path_env == NULL) {
-            fprintf(stderr, "PATH not found in environment\n");
+            fprintf(stderr, "PATH not found\n");
             exit(EXIT_FAILURE);
         }
 
-        // Make a copy of the PATH because strtok modifies it
         char* path_copy = strdup(path_env);
-        if (path_copy == NULL) {
-            perror("strdup");
-            exit(EXIT_FAILURE);
-        }
-
-        // tokenize all paths 
         char* dir = strtok(path_copy, ":");
-        // iterate tokenzied paths for match
         while (dir != NULL) {
             char full_path[1024];
-            // create full_path without buffer overflow
             snprintf(full_path, sizeof(full_path), "%s/%s", dir, program);
-            // Try execv with full path
             execv(full_path, args);
-            // If it fails, try next
             dir = strtok(NULL, ":");
         }
-        // program not found 
-        free(path_copy);
+
         fprintf(stderr, "%s: command not found\n", program);
         exit(EXIT_FAILURE);
     } else {
-        // Parent waits for child process to finish
         int status;
         waitpid(pid, &status, 0);
         return WEXITSTATUS(status);
     }
-
-    return 0;
 }
 
 
@@ -219,22 +230,31 @@ int main(unused int argc, unused char *argv[]) {
             cmd_table[fundex].fun(tokens);
         } else {
             /*  
-                need a function to try to run a program
-                first check if the program exists by checking full path
-                if it does, fork a child process and run the program
-                if it doesn't, print an error message
+                parse the cmdline input and attempt to execute the program via fork process
             */
-
-            // use tokens to get program name and args
-            char *program = tokens_get_token(tokens, 0);
+            char *program = NULL;
             char *args[4096];
-            args[0] = program;
+            char *infile = NULL;
+            char *outfile = NULL;
+            int arg_index = 0;
 
-            for (size_t i = 1; i < tokens_get_length(tokens); i++) {
-                args[i] = tokens_get_token(tokens, i);
+            for (size_t i = 0; i < tokens_get_length(tokens); i++) {
+                char *tok = tokens_get_token(tokens, i);
+
+                if (strcmp(tok, "<") == 0) {
+                    i++;
+                    infile = tokens_get_token(tokens, i);
+                } else if (strcmp(tok, ">") == 0) {
+                    i++;
+                    outfile = tokens_get_token(tokens, i);
+                } else {
+                    args[arg_index++] = tok;
+                }
             }
-
-            execute_prog(program, args);   
+            args[arg_index] = NULL;
+            if (arg_index == 0) continue;
+            program = args[0];
+            execute_prog(program, args, infile, outfile);   
         }
 
         if (shell_is_interactive) {
