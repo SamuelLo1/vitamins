@@ -109,9 +109,20 @@ int lookup(char *cmd) {
 }
 
 
+void handle_sigtstp(int sig) {
+    printf("Child received SIGTSTP\n");
+    exit(0); // Optional: exit for debugging
+}
 
 /* function to handle forking processes for programs executed via shell */
+/*
+    Want to ensure each process is in its own process group 
+    and that the process is in foreground
+    shell should be in the background? 
+*/
 int execute_prog(char* program, char* args[], char* infile, char* outfile) {
+    pid_t main_pid = getpid();
+    
     if (program == NULL) {
         fprintf(stderr, "No program specified\n");
         return -1;
@@ -122,8 +133,19 @@ int execute_prog(char* program, char* args[], char* infile, char* outfile) {
         perror("fork");
         return -1;
     } else if (pid == 0) {
-        // currently input and output still does not work 
-        // not able to write or read input from file
+        // set the process group id to the child process and move to foreground
+        setpgid(getpid(), getpid()); 
+        tcsetpgrp(STDIN_FILENO, getpid()); 
+
+        //child process has default interrupt signal handling 
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, handle_sigtstp);
+        signal(SIGCONT, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+        signal(SIGCHLD, SIG_DFL);
+
         if (infile != NULL) {
             int in_fd = open(infile, O_RDONLY);
             if (in_fd < 0) {
@@ -172,8 +194,27 @@ int execute_prog(char* program, char* args[], char* infile, char* outfile) {
         fprintf(stderr, "%s: command not found\n", program);
         exit(EXIT_FAILURE);
     } else {
+        // Parent process (shell)
+        setpgid(pid, pid); // Make sure child is in its own group
+        tcsetpgrp(STDIN_FILENO, pid); // Give terminal to child
         int status;
         waitpid(pid, &status, 0);
+        /*
+        restore the shell to accept signals and in foreground if no 
+        child processes running
+        */
+        if (tcsetpgrp(STDIN_FILENO, main_pid) == -1) {
+            perror("tcsetpgrp (parent)");
+        }
+        /* restore default interrupt handling in main process */
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
+        signal(SIGCONT, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+        signal(SIGCHLD, SIG_DFL);
+
         return WEXITSTATUS(status);
     }
 }
@@ -210,7 +251,9 @@ void init_shell() {
 
 int main(unused int argc, unused char *argv[]) {
     init_shell();
-
+    pid_t shell_pid = getpid();
+    printf("Shell PID: %d, PGID: %d\n", shell_pid, shell_pgid);
+    
     static char line[4096];
     int line_num = 0;
 
@@ -229,6 +272,16 @@ int main(unused int argc, unused char *argv[]) {
         if (fundex >= 0) {
             cmd_table[fundex].fun(tokens);
         } else {
+            /*
+            main process ignores interrupt signals, child should handle
+            */
+            signal(SIGINT, SIG_IGN);
+            signal(SIGQUIT, SIG_IGN);
+            signal(SIGTSTP, SIG_IGN);
+            signal(SIGCONT, SIG_IGN);
+            signal(SIGTTIN, SIG_IGN);
+            signal(SIGTTOU, SIG_IGN);
+            signal(SIGCHLD, SIG_IGN);
             /*  
                 parse the cmdline input and attempt to execute the program via fork process
             */

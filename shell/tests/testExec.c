@@ -7,9 +7,8 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < argc; i++) {
         printf("  argv[%d]: %s\n", i, argv[i]);
     }
-    // Mimic a process by sleeping for 5 seconds
-    printf("Sleeping for 2 seconds...\n");
-    sleep(2);
-    printf("Done sleeping. Exiting now.\n");
+    // wait for interrupt signal to exit
+    printf("Waiting for interrupt signal to exit...\n");
+    sleep(5);
     return 0;
 }
